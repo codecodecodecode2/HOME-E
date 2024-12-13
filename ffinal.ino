@@ -1,57 +1,58 @@
-#include "BluetoothSerial.h"
+#include "BluetoothSerial.h" // Include BluetoothSerial library
 
-String device_name = "JUDHI T-BEAM";
-BluetoothSerial SerialBT;
+String device_name = "JUDHI T-BEAM"; // Bluetooth device name
+BluetoothSerial SerialBT; // Bluetooth Serial object
 
-int motionSensor = 2;
-int motionState = LOW;
-int motionVal = 0;
+int motionSensor = 2; // Pin for motion sensor
+int motionState = LOW; // State of motion sensor
+int motionVal = 0; // Value read from motion sensor
 
-int soundSensor = 14;
-unsigned long lastSoundToggleTime = 0;
-const unsigned long soundDebounceDelay = 1000;
+int soundSensor = 14; // Pin for sound sensor
+unsigned long lastSoundToggleTime = 0; // Last time sound was detected
+const unsigned long soundDebounceDelay = 1000; // Debounce delay for sound sensor
 
-int echoPin = 23;
-int trigPin = 33;
+int echoPin = 23; // Echo pin for ultrasonic sensor
+int trigPin = 33; // Trigger pin for ultrasonic sensor
 
-#define LEFT_MOTOR_FORWARD 21
-#define LEFT_MOTOR_BACKWARD 22
-#define RIGHT_MOTOR_FORWARD 0
-#define RIGHT_MOTOR_BACKWARD 4
+#define LEFT_MOTOR_FORWARD 21 // Left motor forward pin
+#define LEFT_MOTOR_BACKWARD 22 // Left motor backward pin
+#define RIGHT_MOTOR_FORWARD 0 // Right motor forward pin
+#define RIGHT_MOTOR_BACKWARD 4 // Right motor backward pin
 
-int buzzerPin = 13;
-#define DISTANCE_THRESHOLD 15
+int buzzerPin = 13; // Pin for buzzer
+#define DISTANCE_THRESHOLD 15 // Distance threshold for obstacle avoidance
 
-String currentMotorDirection = "STOPPED";
-bool motorsEnabled = true;
+String currentMotorDirection = "STOPPED"; // Current motor direction
+bool motorsEnabled = true; // Flag to enable or disable motors
 
-unsigned long lastDirectionMessageTime = 0;
-const unsigned long directionMessageInterval = 60000;
+unsigned long lastDirectionMessageTime = 0; // Last time direction was sent
+const unsigned long directionMessageInterval = 60000; // Interval to send direction
 
-unsigned long lastOperationTime = 0;
-const unsigned long operationInterval = 15000;
-bool isStopped = false;
+unsigned long lastOperationTime = 0; // Last time robot operation changed
+const unsigned long operationInterval = 15000; // Interval for operation changes
+bool isStopped = false; // Flag for stopped state
 
 void setup() {
-  Serial.begin(9600);
-  SerialBT.begin(device_name);
+  Serial.begin(9600); // Initialize serial communication
+  SerialBT.begin(device_name); // Initialize Bluetooth
   Serial.printf("Device \"%s\" is ready for pairing.\n", device_name.c_str());
 
-  pinMode(motionSensor, INPUT);
-  pinMode(soundSensor, INPUT_PULLUP);
+  pinMode(motionSensor, INPUT); // Set motion sensor pin as input
+  pinMode(soundSensor, INPUT_PULLUP); // Set sound sensor pin as input with pull-up
 
-  pinMode(echoPin, INPUT);
-  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT); // Set echo pin as input
+  pinMode(trigPin, OUTPUT); // Set trigger pin as output
 
-  pinMode(LEFT_MOTOR_FORWARD, OUTPUT);
-  pinMode(LEFT_MOTOR_BACKWARD, OUTPUT);
-  pinMode(RIGHT_MOTOR_FORWARD, OUTPUT);
-  pinMode(RIGHT_MOTOR_BACKWARD, OUTPUT);
+  pinMode(LEFT_MOTOR_FORWARD, OUTPUT); // Set left motor forward pin as output
+  pinMode(LEFT_MOTOR_BACKWARD, OUTPUT); // Set left motor backward pin as output
+  pinMode(RIGHT_MOTOR_FORWARD, OUTPUT); // Set right motor forward pin as output
+  pinMode(RIGHT_MOTOR_BACKWARD, OUTPUT); // Set right motor backward pin as output
 
-  pinMode(buzzerPin, OUTPUT);
-  digitalWrite(buzzerPin, LOW);
+  pinMode(buzzerPin, OUTPUT); // Set buzzer pin as output
+  digitalWrite(buzzerPin, LOW); // Turn off buzzer initially
 }
 
+// Function to measure distance using ultrasonic sensor
 int measureDistance() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -59,13 +60,14 @@ int measureDistance() {
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-  long duration = pulseIn(echoPin, HIGH, 30000);
+  long duration = pulseIn(echoPin, HIGH, 30000); // Measure pulse duration
 
-  if (duration == 0) return -1;
+  if (duration == 0) return -1; // Return -1 if no echo detected
 
-  return duration / 58;
+  return duration / 58; // Convert duration to distance in cm
 }
 
+// Move robot forward
 void moveForward() {
   if (!motorsEnabled) return;
   digitalWrite(LEFT_MOTOR_FORWARD, LOW);
@@ -75,6 +77,7 @@ void moveForward() {
   currentMotorDirection = "FORWARD";
 }
 
+// Turn robot left
 void turnLeft() {
   if (!motorsEnabled) return;
   digitalWrite(LEFT_MOTOR_FORWARD, LOW);
@@ -84,6 +87,7 @@ void turnLeft() {
   currentMotorDirection = "LEFT";
 }
 
+// Turn robot right
 void turnRight() {
   if (!motorsEnabled) return;
   digitalWrite(LEFT_MOTOR_FORWARD, HIGH);
@@ -93,6 +97,7 @@ void turnRight() {
   currentMotorDirection = "RIGHT";
 }
 
+// Stop the robot's motors
 void stopMotors() {
   digitalWrite(LEFT_MOTOR_FORWARD, LOW);
   digitalWrite(RIGHT_MOTOR_FORWARD, LOW);
@@ -101,12 +106,14 @@ void stopMotors() {
   currentMotorDirection = "STOPPED";
 }
 
+// Send current motor direction over Bluetooth
 void sendMotorDirection() {
   String directionMessage = "Motor Direction: " + currentMotorDirection;
   SerialBT.println(directionMessage);
   Serial.println(directionMessage);
 }
 
+// Handle motion sensor events
 void handleMotionSensor() {
   motionVal = digitalRead(motionSensor);
 
@@ -121,6 +128,7 @@ void handleMotionSensor() {
   }
 }
 
+// Handle sound sensor events
 void handleSoundSensor() {
   unsigned long currentMillis = millis();
   int soundVal = digitalRead(soundSensor);
@@ -131,6 +139,7 @@ void handleSoundSensor() {
   }
 }
 
+// Check if both motion and sound are detected and activate buzzer
 void checkMotionAndSound() {
   if (motionVal == HIGH && digitalRead(soundSensor) == HIGH) {
     Serial.println("Both motion and sound detected! Activating buzzer.");
@@ -141,6 +150,7 @@ void checkMotionAndSound() {
   }
 }
 
+// Handle obstacle avoidance logic using ultrasonic sensor
 void handleObstacleAvoidance() {
   if (!motorsEnabled || isStopped) return;
 
@@ -150,13 +160,13 @@ void handleObstacleAvoidance() {
     SerialBT.printf("Ultrasonic Distance: %d cm\n", distance);
 
     if (distance < DISTANCE_THRESHOLD) {
-      stopMotors();
+      stopMotors(); // Stop if obstacle is too close
 
-      turnLeft();
+      turnLeft(); // Check left direction
       delay(500);
       int leftDistance = measureDistance();
 
-      turnRight();
+      turnRight(); // Check right direction
       delay(1000);
       int rightDistance = measureDistance();
 
@@ -170,11 +180,12 @@ void handleObstacleAvoidance() {
         moveForward();
       }
     } else {
-      moveForward();
+      moveForward(); // Move forward if no obstacle
     }
   }
 }
 
+// Handle Bluetooth commands to start or stop the robot
 void handleBluetoothCommands() {
   if (SerialBT.available()) {
     String dataFromBluetooth = SerialBT.readString();
@@ -194,6 +205,7 @@ void handleBluetoothCommands() {
 void loop() {
   unsigned long currentMillis = millis();
 
+  // Periodically stop the robot and activate sensors
   if (currentMillis - lastOperationTime >= operationInterval) {
     lastOperationTime = currentMillis;
 
@@ -220,11 +232,12 @@ void loop() {
     handleObstacleAvoidance();
     handleBluetoothCommands();
 
+    // Periodically send motor direction
     if (currentMillis - lastDirectionMessageTime >= directionMessageInterval) {
       sendMotorDirection();
       lastDirectionMessageTime = currentMillis;
     }
   }
 
-  delay(50);
+  delay(50); // Small delay for stability
 }
